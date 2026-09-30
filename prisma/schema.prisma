@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  superadmin
+  manager
+  fulfilment
+  support
+  viewer
+}
+
+enum OrderStatus {
+  pending
+  paid
+  packing
+  ready
+  shipped
+  delivered
+  picked_up
+  completed
+  cancelled
+  refunded
+}
+
+enum PackType {
+  single
+  fixed
+  mixed
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  image       String?
+  families    Family[]
+  createdAt   DateTime @default(now())
+}
+
+model Family {
+  id           String      @id @default(cuid())
+  slug         String      @unique
+  name         String
+  description  String?
+  collectionId String?
+  collection   Collection? @relation(fields: [collectionId], references: [id])
+  moq          Int         @default(1)
+  wholesaleMin Int         @default(12)
+  variants     Variant[]
+  packs        PackDef[]
+  tiers        PriceTier[]
+  createdAt    DateTime    @default(now())
+}
+
+model Variant {
+  id       String        @id @default(cuid())
+  sku      String        @unique
+  familyId String
+  family   Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  colour   String
+  finish   String?
+  shape    String?
+  images   String[]
+  stock    Int           @default(0)
+  lowAt    Int           @default(5)
+  ledger   StockLedger[]
+
+  @@index([familyId])
+}
+
+model PackDef {
+  id            String          @id @default(cuid())
+  familyId      String
+  family        Family          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  type          PackType
+  name          String
+  fixedQty      Int?
+  minQty        Int?
+  maxPerVariant Int?
+  components    PackComponent[]
+}
+
+model PackComponent {
+  id        String  @id @default(cuid())
+  packId    String
+  pack      PackDef @relation(fields: [packId], references: [id], onDelete: Cascade)
+  variantId String
+  qty       Int
+}
+
+model PriceTier {
+  id             String @id @default(cuid())
+  familyId       String
+  family         Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  packId         String?
+  minQty         Int
+  retailPrice    Int
+  wholesalePrice Int
+
+  @@unique([familyId, packId, minQty])
+  @@index([familyId, minQty])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  ref         String      @unique
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  status      OrderStatus @default(pending)
+  subtotal    Int
+  deliveryFee Int         @default(0)
+  total       Int
+  zone        String?
+  fulfilment  String?
+  source      String?
+  utm         Json?
+  items       OrderItem[]
+  payments    Payment[]
+  events      OrderEvent[]
+  createdAt   DateTime    @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  familyId  String
+  variantId String
+  packId    String?
+  name      String
+  unitPrice Int
+  qty       Int
+  lineTotal Int
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider    String   @default("paystack")
+  providerRef String   @unique
+  amount      Int
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model OrderEvent {
+  id        String       @id @default(cuid())
+  orderId   String
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  from      OrderStatus?
+  to        OrderStatus
+  actor     String?
+  note      String?
+  createdAt DateTime     @default(now())
+}
+
+model StockLedger {
+  id        String   @id @default(cuid())
+  variantId String
+  variant   Variant  @relation(fields: [variantId], references: [id])
+  delta     Int
+  reason    String
+  actor     String?
+  orderRef  String?
+  createdAt DateTime @default(now())
+
+  @@index([variantId])
+}
+
+model FaqPolicy {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  question  String
+  answer    String
+  updatedAt DateTime @updatedAt
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  channel   String    @default("whatsapp")
+  phone     String
+  orderRef  String?
+  handedOff Boolean   @default(false)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  text           String
+  sources        Json?
+  createdAt      DateTime     @default(now())
+}
+
+model StaffUser {
+  id    String @id @default(cuid())
+  email String @unique
+  name  String
+  role  Role   @default(viewer)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+  createdAt DateTime @default(now())
+}

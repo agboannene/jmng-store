@@ -1,0 +1,23 @@
+# deps / build
+node_modules/
+.next/
+out/
+dist/
+
+# env — never commit real keys
+.env
+.env.local
+.env*.local
+
+# prisma
+prisma/migrations/dev/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# vercel
+.vercel

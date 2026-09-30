@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: jmng
+      POSTGRES_PASSWORD: jmng
+      POSTGRES_DB: jewelrymallng
+    volumes: [pgdata:/var/lib/postgresql/data]
+    ports: ['5432:5432']
+  app:
+    build: .
+    env_file: .env
+    ports: ['3000:3000']
+    depends_on: [db]
+volumes:
+  pgdata:
